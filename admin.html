@@ -1,99 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>RMHS Admin Panel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <title>RMHS ERP</title>
   <style>
-    body { font-family: Arial; padding: 15px; background: #f5f5f5; }
-  .card { background: white; padding: 20px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 4px #ccc; }
-    input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-    button { background: #1976d2; color: white; border: none; font-weight: bold; }
-    h2 { color: #1976d2; }
-  .hidden { display: none; }
-  .error { color: red; margin-top: 10px; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    input { padding: 6px; margin: 2px; }
+    button { padding: 8px 12px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+    button:hover { background: #0056b3; }
+    .tab-content { margin-top: 20px; }
+    #feeSetupStatus { color: green; font-weight: bold; }
   </style>
 </head>
 <body>
-  <div class="card" id="loginDiv">
-    <h2>RMHS Admin Login</h2>
-    <input id="adminUser" placeholder="Username" value="admin">
-    <input id="adminPass" type="password" placeholder="Password" value="admin123">
-    <button onclick="createAdmin()">Create Admin + Login</button>
-    <p class="error" id="loginError"></p>
-  </div>
 
-  <div class="card hidden" id="mainDiv">
-    <h2>Add Students via Excel</h2>
-    <p>Excel columns: studentId, name, class, section, rollNo, fatherName, mobile, totalFees, password</p>
-    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv">
-    <button onclick="uploadStudents()">Upload Students</button>
-    <p id="status"></p>
-  </div>
+<div id="loginBox">
+  <h2>RMHS ERP Login</h2>
+  <input id="username" placeholder="Username"><br><br>
+  <input id="password" type="password" placeholder="Password"><br><br>
+  <button onclick="login()">Login</button>
+</div>
 
-<script>
-const API = 'https://fee-backemd-rmhs.onrender.com';
-let TOKEN = '';
+<div id="dashboard" style="display:none">
+  <h2>RMHS ERP - <span id="userRole"></span></h2>
+  <button onclick="logout()" style="background:#dc3545">Logout</button>
+  <hr>
 
-async function createAdmin() {
-  const username = document.getElementById('adminUser').value.trim();
-  const password = document.getElementById('adminPass').value;
-  const errorEl = document.getElementById('loginError');
-  errorEl.innerText = '';
-  
-  if (!username ||!password) {
-    errorEl.innerText = 'Enter username and password';
-    return;
-  }
-  
-  // Step 1: Try creating admin
-  const createRes = await fetch(`${API}/admin/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const createData = await createRes.json();
-  
-  // Step 2: Login
-  const loginRes = await fetch(`${API}/admin/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  
-  const loginData = await loginRes.json();
-  
-  if (loginData.token) {
-    TOKEN = loginData.token;
-    document.getElementById('loginDiv').classList.add('hidden');
-    document.getElementById('mainDiv').classList.remove('hidden');
-  } else {
-    errorEl.innerText = loginData.error || 'Login failed. If admin exists, use correct password.';
-  }
-}
+  <button id="feeSetupTab" onclick="showTab('feeSetup')">Fee Setup</button>
+  <button onclick="showTab('admission')">Admission</button>
+  <button onclick="showTab('collection')">Fee Collection</button>
 
-function uploadStudents() {
-  const file = document.getElementById('excelFile').files[0];
-  if (!file) return alert('Select Excel file');
-  
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const workbook = XLSX.read(e.target.result);
-    const students = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-    
-    document.getElementById('status').innerText = `Uploading ${students.length} students...`;
-    
-    for (let s of students) {
-      await fetch(`${API}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN },
-        body: JSON.stringify(s)
-      });
-    }
-    document.getElementById('status').innerText = `Done! ${students.length} students added.`;
-  };
-  reader.readAsArrayBuffer(file);
-}
-</script>
-</body>
-</html>
+  <div id="feeSetup" class="tab-content">
+    <h3>Class-wise Fee Structure</h3>
+    <p id="feeSetupStatus"></p>
+    <div id="feeTable"></div>
+
+    <div style="margin-top:30px; border-top:2px solid #ddd; padding-top:20px">
+      <h3>Add Custom Fee Head</h3>
+      <div style="display:flex; gap:10px; margin
