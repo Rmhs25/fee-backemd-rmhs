@@ -226,4 +226,7 @@ app.get('/api/report', auth, async (req, res) => {
 });
 
 app.get('*', (req, res) => res.sendFile(__dirname + '/public/index.html'));
+app.get('/', (req, res) => {
+  res.send('<h1>Zee School ERP Running</h1><p>Backend is live ✅</p>')
+})
 app.listen(PORT, () => console.log(`Server on ${PORT}`));
