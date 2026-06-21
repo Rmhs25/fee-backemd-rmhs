@@ -149,3 +149,7 @@ app.get('/students/:id', verifyToken, async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+const isAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') return res.status(403).send('Admin only');
+  next();
+}
