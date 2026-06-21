@@ -14,7 +14,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
 // Cloudinary Config
 cloudinary.config({
@@ -32,7 +31,7 @@ mongoose.connect(process.env.MONGO_URI).then(() => console.log('DB Connected'));
 const userSchema = new mongoose.Schema({
   username: String,
   password: String,
-  role: { type: String, default: 'admin' } // admin, clerk, teacher
+  role: { type: String, default: 'admin' }
 });
 const User = mongoose.model('User', userSchema);
 
@@ -92,7 +91,11 @@ const auth = (req, res, next) => {
 // Routes
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// 1. Login - Multi User
+app.get('/', (req, res) => {
+  res.send('<h1>Zee School ERP Running</h1><p>Backend is live ✅</p><p>DB Connected</p>')
+});
+
+// 1. Login
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   let user = await User.findOne({ username });
@@ -121,7 +124,7 @@ app.post('/api/upload', auth, upload.single('photo'), async (req, res) => {
   }
 });
 
-// 3. Add Student with Photo + Fee Heads
+// 3. Add Student
 app.post('/api/student', auth, async (req, res) => {
   try {
     const student = new Student(req.body);
@@ -140,7 +143,7 @@ app.get('/api/students', auth, async (req, res) => {
   res.json(students);
 });
 
-// 5. Collect Fee with Heads
+// 5. Collect Fee
 app.post('/api/collect-fee', auth, async (req, res) => {
   const { studentId, feeHeads, paymentMode } = req.body;
   const student = await Student.findById(studentId);
@@ -195,7 +198,7 @@ app.get('/api/receipt/:receiptNo', auth, async (req, res) => {
 // 7. ID Card PDF
 app.get('/api/idcard/:studentId', auth, async (req, res) => {
   const student = await Student.findById(req.params.studentId);
-  const doc = new PDFDocument({ size: [242, 153], margin: 10 }); // Credit card size
+  const doc = new PDFDocument({ size: [242, 153], margin: 10 });
   res.setHeader('Content-Type', 'application/pdf');
   doc.pipe(res);
 
@@ -225,8 +228,4 @@ app.get('/api/report', auth, async (req, res) => {
   res.json(data);
 });
 
-app.get('*', (req, res) => res.sendFile(__dirname + '/public/index.html'));
-app.get('/', (req, res) => {
-  res.send('<h1>Zee School ERP Running</h1><p>Backend is live ✅</p>')
-})
 app.listen(PORT, () => console.log(`Server on ${PORT}`));
