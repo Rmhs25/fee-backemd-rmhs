@@ -43,66 +43,119 @@ const adminSchema = new mongoose.Schema({
 const Student = mongoose.model('Student', studentSchema);
 const Admin = mongoose.model('Admin', adminSchema);
 
+// Middleware to verify token
+const verifyToken = (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) return res.status(403).json({ error: 'No token' });
+  
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(401).json({ error: 'Invalid token' });
+    req.userId = decoded.id;
+    next();
+  });
+};
+
 // Routes
 app.get('/', (req, res) => res.send('RMHS Backend Running'));
 
+// Create First Admin - Use once then remove
+app.post('/admin/create', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const exists = await Admin.findOne({ username });
+    if (exists) return res.status(400).json({ error: 'Admin already exists' });
+    
+    const hashedPass = await bcrypt.hash(password, 10);
+    const admin = new Admin({ username, password: hashedPass });
+    await admin.save();
+    res.json({ message: 'Admin created successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin Login
 app.post('/admin/login', async (req, res) => {
-  const { username, password } = req.body;
-  const admin = await Admin.findOne({ username });
-  if (!admin || !await bcrypt.compare(password, admin.password)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+  try {
+    const { username, password } = req.body;
+    const admin = await Admin.findOne({ username });
+    if (!admin || !await bcrypt.compare(password, admin.password)) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: admin._id }, JWT_SECRET);
+    res.json({ token, username: admin.username });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const token = jwt.sign({ id: admin._id }, JWT_SECRET);
-  res.json({ token });
 });
 
 // Student Login
 app.post('/student/login', async (req, res) => {
-  const { studentId, password } = req.body;
-  const student = await Student.findOne({ studentId });
-  if (!student || !await bcrypt.compare(password, student.password)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+  try {
+    const { studentId, password } = req.body;
+    const student = await Student.findOne({ studentId });
+    if (!student || !await bcrypt.compare(password, student.password)) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: student._id }, JWT_SECRET);
+    res.json({ token, student });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const token = jwt.sign({ id: student._id }, JWT_SECRET);
-  res.json({ token, student });
 });
 
 // Get All Students - Admin only
-app.get('/students', async (req, res) => {
-  const students = await Student.find();
-  res.json(students);
+app.get('/students', verifyToken, async (req, res) => {
+  try {
+    const students = await Student.find();
+    res.json(students);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Add Student - Admin only
-app.post('/students', async (req, res) => {
-  const hashedPass = await bcrypt.hash(req.body.password, 10);
-  req.body.password = hashedPass;
-  req.body.dues = req.body.totalFees - req.body.paidFees;
-  const student = new Student(req.body);
-  await student.save();
-  res.json(student);
+// Add Single Student - Admin only
+app.post('/students', verifyToken, async (req, res) => {
+  try {
+    const hashedPass = await bcrypt.hash(req.body.password, 10);
+    req.body.password = hashedPass;
+    req.body.dues = req.body.totalFees - (req.body.paidFees || 0);
+    const student = new Student(req.body);
+    await student.save();
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Update Fees - Admin only
-app.put('/students/:id/fees', async (req, res) => {
-  const student = await Student.findById(req.params.id);
-  student.paidFees += req.body.amount;
-  student.dues = student.totalFees - student.paidFees;
-  student.payments.push({ amount: req.body.amount, date: new Date(), receipt: req.body.receipt });
-  await student.save();
-  res.json(student);
+app.put('/students/:id/fees', verifyToken, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    
+    student.paidFees += Number(req.body.amount);
+    student.dues = student.totalFees - student.paidFees;
+    student.payments.push({ 
+      amount: Number(req.body.amount), 
+      date: new Date(), 
+      receipt: req.body.receipt || `RCP${Date.now()}`
+    });
+    await student.save();
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Student by ID - Student/Admin
+app.get('/students/:id', verifyToken, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-// Create First Admin - Remove after use
-app.post('/admin/create', async (req, res) => {
-  const { username, password } = req.body;
-  const exists = await Admin.findOne({ username });
-  if (exists) return res.status(400).json({ error: 'Admin exists' });
-  
-  const hashedPass = await bcrypt.hash(password, 10);
-  const admin = new Admin({ username, password: hashedPass });
-  await admin.save();
-  res.json({ message: 'Admin created' });
-});
