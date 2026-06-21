@@ -3,22 +3,21 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path'); // <-- ADD THIS
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); // Add this line
+app.use(express.static(path.join(__dirname))); // <-- THIS SERVES admin.html
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rmhs_secret_key_2026';
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('MongoDB Connected'))
 .catch(err => console.log(err));
 
-// Student Schema
 const studentSchema = new mongoose.Schema({
   studentId: { type: String, unique: true },
   name: String,
@@ -35,7 +34,6 @@ const studentSchema = new mongoose.Schema({
   password: String
 });
 
-// Admin Schema  
 const adminSchema = new mongoose.Schema({
   username: { type: String, unique: true },
   password: String
@@ -44,7 +42,6 @@ const adminSchema = new mongoose.Schema({
 const Student = mongoose.model('Student', studentSchema);
 const Admin = mongoose.model('Admin', adminSchema);
 
-// Middleware to verify token
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization'];
   if (!token) return res.status(403).json({ error: 'No token' });
@@ -56,10 +53,8 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// Routes
 app.get('/', (req, res) => res.send('RMHS Backend Running'));
 
-// Create First Admin - Use once then remove
 app.post('/admin/create', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -75,7 +70,6 @@ app.post('/admin/create', async (req, res) => {
   }
 });
 
-// Admin Login
 app.post('/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -90,7 +84,6 @@ app.post('/admin/login', async (req, res) => {
   }
 });
 
-// Student Login
 app.post('/student/login', async (req, res) => {
   try {
     const { studentId, password } = req.body;
@@ -105,7 +98,6 @@ app.post('/student/login', async (req, res) => {
   }
 });
 
-// Get All Students - Admin only
 app.get('/students', verifyToken, async (req, res) => {
   try {
     const students = await Student.find();
@@ -115,7 +107,6 @@ app.get('/students', verifyToken, async (req, res) => {
   }
 });
 
-// Add Single Student - Admin only
 app.post('/students', verifyToken, async (req, res) => {
   try {
     const hashedPass = await bcrypt.hash(req.body.password, 10);
@@ -129,7 +120,6 @@ app.post('/students', verifyToken, async (req, res) => {
   }
 });
 
-// Update Fees - Admin only
 app.put('/students/:id/fees', verifyToken, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -149,7 +139,6 @@ app.put('/students/:id/fees', verifyToken, async (req, res) => {
   }
 });
 
-// Get Student by ID - Student/Admin
 app.get('/students/:id', verifyToken, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
