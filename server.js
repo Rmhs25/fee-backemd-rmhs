@@ -95,3 +95,14 @@ app.put('/students/:id/fees', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+// Create First Admin - Remove after use
+app.post('/admin/create', async (req, res) => {
+  const { username, password } = req.body;
+  const exists = await Admin.findOne({ username });
+  if (exists) return res.status(400).json({ error: 'Admin exists' });
+  
+  const hashedPass = await bcrypt.hash(password, 10);
+  const admin = new Admin({ username, password: hashedPass });
+  await admin.save();
+  res.json({ message: 'Admin created' });
+});
