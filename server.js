@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const path = require('path'); // <-- ADD THIS
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname))); // <-- THIS SERVES admin.html
+app.use(express.static(path.join(__dirname)));
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rmhs_secret_key_2026';
@@ -31,12 +31,13 @@ const studentSchema = new mongoose.Schema({
   paidFees: { type: Number, default: 0 },
   dues: { type: Number, default: 0 },
   payments: [{ amount: Number, date: Date, receipt: String }],
-  password: String
+  password: { type: String, default: '' } // <-- OPTIONAL NOW
 });
 
 const adminSchema = new mongoose.Schema({
   username: { type: String, unique: true },
-  password: String
+  password: String,
+  role: { type: String, enum: ['admin', 'staff'], default: 'staff' } // <-- ADDED ROLE
 });
 
 const Student = mongoose.model('Student', studentSchema);
@@ -47,109 +48,4 @@ const verifyToken = (req, res, next) => {
   if (!token) return res.status(403).json({ error: 'No token' });
   
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' });
-    req.userId = decoded.id;
-    next();
-  });
-};
-
-app.get('/', (req, res) => res.send('RMHS Backend Running'));
-
-app.post('/admin/create', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const exists = await Admin.findOne({ username });
-    if (exists) return res.status(400).json({ error: 'Admin already exists' });
-    
-    const hashedPass = await bcrypt.hash(password, 10);
-    const admin = new Admin({ username, password: hashedPass });
-    await admin.save();
-    res.json({ message: 'Admin created successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/admin/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const admin = await Admin.findOne({ username });
-    if (!admin || !await bcrypt.compare(password, admin.password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const token = jwt.sign({ id: admin._id }, JWT_SECRET);
-    res.json({ token, username: admin.username });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/student/login', async (req, res) => {
-  try {
-    const { studentId, password } = req.body;
-    const student = await Student.findOne({ studentId });
-    if (!student || !await bcrypt.compare(password, student.password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const token = jwt.sign({ id: student._id }, JWT_SECRET);
-    res.json({ token, student });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/students', verifyToken, async (req, res) => {
-  try {
-    const students = await Student.find();
-    res.json(students);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/students', verifyToken, async (req, res) => {
-  try {
-    const hashedPass = await bcrypt.hash(req.body.password, 10);
-    req.body.password = hashedPass;
-    req.body.dues = req.body.totalFees - (req.body.paidFees || 0);
-    const student = new Student(req.body);
-    await student.save();
-    res.json(student);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/students/:id/fees', verifyToken, async (req, res) => {
-  try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ error: 'Student not found' });
-    
-    student.paidFees += Number(req.body.amount);
-    student.dues = student.totalFees - student.paidFees;
-    student.payments.push({ 
-      amount: Number(req.body.amount), 
-      date: new Date(), 
-      receipt: req.body.receipt || `RCP${Date.now()}`
-    });
-    await student.save();
-    res.json(student);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/students/:id', verifyToken, async (req, res) => {
-  try {
-    const student = await Student.findById(req.params.id);
-    res.json(student);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-const isAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).send('Admin only');
-  next();
-}
+    if (err) return res.status(401).
