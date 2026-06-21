@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RMHS Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial; padding: 15px; background: #f5f5f5; }
+   .card { background: white; padding: 20px; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 4px #ccc; }
+    input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
+    button { background: #1976d2; color: white; border: none; font-weight: bold; }
+    h2 { color: #1976d2; }
+   .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card" id="loginDiv">
+    <h2>RMHS Admin Login</h2>
+    <input id="adminUser" placeholder="Username" value="admin">
+    <input id="adminPass" type="password" placeholder="Password">
+    <button onclick="createAdmin()">Create Admin + Login</button>
+  </div>
+
+  <div class="card hidden" id="mainDiv">
+    <h2>Add Students via Excel</h2>
+    <p>Upload Excel: studentId, name, class, section, rollNo, fatherName, mobile, totalFees, password</p>
+    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv">
+    <button onclick="uploadStudents()">Upload Students</button>
+    <p id="status"></p>
+  </div>
+
+<script>
+const API = 'https://fee-backemd-rmhs.onrender.com';
+let TOKEN = '';
+
+async function createAdmin() {
+  const username = document.getElementById('adminUser').value;
+  const password = document.getElementById('adminPass').value;
+  
+  // Create admin first time
+  await fetch(`${API}/admin/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  }).catch(() => {});
+  
+  // Login
+  const res = await fetch(`${API}/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  
+  const data = await res.json();
+  if (data.token) {
+    TOKEN = data.token;
+    document.getElementById('loginDiv').classList.add('hidden');
+    document.getElementById('mainDiv').classList.remove('hidden');
+  } else {
+    alert('Login failed');
+  }
+}
+
+function uploadStudents() {
+  const file = document.getElementById('excelFile').files[0];
+  if (!file) return alert('Select Excel file');
+  
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const workbook = XLSX.read(e.target.result);
+    const students = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+    
+    document.getElementById('status').innerText = `Uploading ${students.length} students...`;
+    
+    for (let s of students) {
+      await fetch(`${API}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN },
+        body: JSON.stringify(s)
+      });
+    }
+    document.getElementById('status').innerText = `Done! ${students.length} students added.`;
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+  </html>
